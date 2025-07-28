@@ -110,6 +110,7 @@ def main(*argv):
             raise FileNotFoundError(dest + " is not a directory")
         with rpmfile.open(fileobj=buf) as rpm:
             for rpminfo in rpm.getmembers():
+                issymlink = bool(rpminfo.issymlink())
                 with rpm.extractfile(rpminfo.name) as rpmfileobj:
                     dirs = rpminfo.name.split("/")
                     filename = dirs.pop()
@@ -122,11 +123,14 @@ def main(*argv):
                     target = os.path.abspath(os.path.join(dest, *(dirs + [filename])))
                     if not target.startswith(dest):
                         raise ValueError("Attempted path traveral: " + target)
-                    outfile = open(target, "wb")
-                    try:
-                        outfile.write(rpmfileobj.read())
-                    finally:
-                        outfile.close()
+                    if issymlink:
+                        os.symlink(rpmfileobj.read().decode(), target)
+                    else:
+                        outfile = open(target, "wb")
+                        try:
+                            outfile.write(rpmfileobj.read())
+                        finally:
+                            outfile.close()
                     if args.verbose:
                         print(target)
                     output["extracted"].append(rpminfo.name.split("/"))
